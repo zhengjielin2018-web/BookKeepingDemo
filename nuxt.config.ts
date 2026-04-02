@@ -10,11 +10,10 @@ export default defineNuxtConfig({
   ],
 
   auth: {
-    baseURL: process.env.AUTH_ORIGIN
-      ? `${process.env.AUTH_ORIGIN}/api/auth`
-      : '/api/auth',
+    baseURL: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/auth`,
     provider: {
       type: 'authjs',
+      trustHost: true,
     },
   },
 
