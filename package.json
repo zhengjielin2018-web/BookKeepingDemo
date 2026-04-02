@@ -1,0 +1,33 @@
+{
+  "name": "BookKeepingDemo",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@auth/drizzle-adapter": "^1.11.1",
+    "@google/generative-ai": "^0.24.1",
+    "@sidebase/nuxt-auth": "^1.2.0",
+    "@vercel/postgres": "^0.10.0",
+    "bcrypt": "^6.0.0",
+    "chart.js": "^4.5.1",
+    "drizzle-orm": "^0.45.2",
+    "next-auth": "^4.21.1",
+    "nuxt": "^4.4.2",
+    "vue": "^3.5.31",
+    "vue-chartjs": "^5.3.3",
+    "vue-router": "^5.0.4"
+  },
+  "devDependencies": {
+    "@nuxtjs/tailwindcss": "^6.14.0",
+    "@types/bcrypt": "^6.0.0",
+    "drizzle-kit": "^0.31.10",
+    "shadcn-nuxt": "^2.4.3",
+    "tailwindcss": "^3.4.19"
+  }
+}

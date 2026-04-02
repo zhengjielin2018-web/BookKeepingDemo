@@ -1,0 +1,73 @@
+【專案概述】
+請協助我使用 Nuxt 4 建立一個「AI 輔助記帳應用」。此專案採用全端架構（Frontend + Server API 皆在 Nuxt 內完成），使用者可以透過自然語言對話來紀錄花費與查詢歷史帳目。資料需永久儲存，並具備完整的使用者身分驗證。
+
+【技術選型與規範】
+
+核心框架： Nuxt 4 (Vue 3, Composition API, <script setup>)。
+
+UI / 樣式： Tailwind CSS + Shadcn-Vue (用於快速建立對話框與輸入介面)。
+
+後端 API： Nuxt Server Routes (/server/api/...)。所有與資料庫和第三方 API 的互動都必須在伺服器端完成，嚴禁在前端暴露任何金鑰。
+
+資料庫： Vercel Postgres。
+
+ORM： Drizzle ORM (PostgreSQL 版本)。需具備完整的型別安全與 Migration 配置。
+
+身分驗證： NuxtAuth (@sidebase/nuxt-auth 或 Auth.js)。搭配 Drizzle Adapter，使用 Credentials (Email/Password) 將帳號資料存在我們自己的 Postgres 資料庫中。
+
+AI 引擎： 官方 @google/generative-ai SDK (Gemini 1.5 Flash 模型)。
+
+【資料庫設計 (Schema 概念)】
+除了 Auth.js 預設的 Users, Accounts, Sessions 表格之外，請建立以下核心資料表：
+
+Transactions (記帳明細)：
+
+id: UUID 或 Serial
+
+userId: 關聯至 Users 表 (確保資料隔離)
+
+amount: Integer (金額)
+
+type: String (收入/支出)
+
+category: String (例如：飲食、交通、娛樂)
+
+description: String (備註說明)
+
+date: Date (交易日期)
+
+createdAt: Timestamp
+
+【核心功能與資料流】
+
+認證保護： 首頁為 Landing Page，對話記帳頁面需登入後才能訪問 (definePageMeta({ middleware: 'auth' }))。
+
+自然語言寫入 (Function Calling 策略)：
+
+使用者輸入：「今天午餐吃拉麵花了 200 元」。
+
+前端將文字送至 POST /api/chat。
+
+Nuxt 後端呼叫 Gemini API，使用 Structured Output 或 Function Calling，強制 AI 將輸入解析為 JSON { "amount": 200, "category": "飲食", "description": "拉麵", "date": "YYYY-MM-DD" }。
+
+Nuxt 後端取得 JSON 後，透過 Drizzle 將資料寫入 Transactions 表格。
+
+回傳成功訊息給前端。
+
+自然語言查詢 (RAG 策略)：
+
+使用者輸入：「我這個月餐費花多少？」。
+
+Gemini 判斷為查詢請求，產出查詢條件。
+
+Nuxt 後端透過 Drizzle 撈取該使用者的資料並加總。
+
+將結果提供給 Gemini 生成自然的人類回覆：「您這個月的飲食總花費為 XXX 元」。
+
+【環境變數 (.env) 預留】
+
+POSTGRES_URL (Vercel Database 連線字串)
+
+GEMINI_API_KEY (Google AI Studio 金鑰)
+
+AUTH_SECRET (NuxtAuth 用於加密 Session 的隨機字串)
