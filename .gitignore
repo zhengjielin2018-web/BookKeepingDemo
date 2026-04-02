@@ -18,6 +18,9 @@ logs
 .fleet
 .idea
 
+# Override global gitignore for server debug API route
+!server/api/debug/
+
 # Local env files
 .env
 .env.*
