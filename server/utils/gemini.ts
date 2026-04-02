@@ -151,7 +151,7 @@ export async function chat(
   executeFn: (name: string, args: Record<string, unknown>) => Promise<unknown>,
 ): Promise<ChatResult> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3-flash',
+    model: 'gemini-3.1-flash-lite-preview',
     systemInstruction: buildSystemPrompt(),
     tools,
   })
