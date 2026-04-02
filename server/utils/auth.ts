@@ -1,6 +1,11 @@
-import CredentialsProvider from 'next-auth/providers/credentials'
+import Credentials from 'next-auth/providers/credentials'
 import { DrizzleAdapter } from '@auth/drizzle-adapter'
-import bcrypt from 'bcrypt'
+import * as bcryptModule from 'bcrypt'
+
+const bcrypt = (bcryptModule as any).default ?? bcryptModule
+
+// Handle CJS default export in ESM context
+const CredentialsProvider = (Credentials as any).default ?? Credentials
 import { eq } from 'drizzle-orm'
 import { db } from './db'
 import { users } from '../database/schema'

@@ -1,4 +1,6 @@
-import bcrypt from 'bcrypt'
+import * as bcryptModule from 'bcrypt'
+
+const bcrypt = (bcryptModule as any).default ?? bcryptModule
 import { eq, and, isNull } from 'drizzle-orm'
 import { db } from '../../utils/db'
 import { users, inviteCodes } from '../../database/schema'
