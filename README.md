@@ -31,7 +31,7 @@
 - **ORM**: [Drizzle ORM](https://orm.drizzle.team/)
 - **認證**: [NuxtAuth](https://sidebase.io/nuxt-auth) (Auth.js + Credentials Provider)
 - **密碼加密**: bcrypt
-- **AI 引擎**: [Google Gemini API](https://ai.google.dev/) (gemini-1.5-flash-latest)
+- **AI 引擎**: [Google Gemini API](https://ai.google.dev/) (gemini-3.1-flash-lite-preview)
 
 ### 開發工具
 - **TypeScript**: 完整的類型支援
