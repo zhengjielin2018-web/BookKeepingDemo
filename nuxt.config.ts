@@ -1,4 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import { readFileSync } from 'node:fs'
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-01-01',
   future: { compatibilityVersion: 4 },
@@ -26,5 +29,8 @@ export default defineNuxtConfig({
     postgresUrl: process.env.POSTGRES_URL,
     geminiApiKey: process.env.GEMINI_API_KEY,
     authSecret: process.env.AUTH_SECRET,
+    public: {
+      appVersion: pkg.version,
+    },
   },
 })

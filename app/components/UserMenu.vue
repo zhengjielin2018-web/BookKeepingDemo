@@ -1,6 +1,7 @@
 <!-- app/components/UserMenu.vue -->
 <script setup lang="ts">
 const { data: session, signOut } = useAuth()
+const config = useRuntimeConfig()
 
 const open = ref(false)
 
@@ -35,6 +36,9 @@ async function handleLogout() {
       >
         登出
       </button>
+      <div class="px-3 py-2 text-xs text-gray-400 border-t">
+        v{{ config.public.appVersion }}
+      </div>
     </div>
 
     <!-- Click outside to close -->
