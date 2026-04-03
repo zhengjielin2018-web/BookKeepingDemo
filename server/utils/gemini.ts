@@ -102,14 +102,16 @@ const tools: FunctionDeclarationsTool[] = [
   },
 ]
 
-function buildSystemPrompt(): string {
+function buildSystemPrompt(userName?: string): string {
   const now = new Date()
   const weekdays = ['日', '一', '二', '三', '四', '五', '六']
   const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（星期${weekdays[now.getDay()]}）`
 
+  const userGreeting = userName ? `使用者的名稱是「${userName}」，請在對話中以此名稱稱呼使用者。\n\n` : ''
+
   return `你是一個記帳助手，幫使用者記錄收支和查詢帳目。
 
-今天是 ${dateStr}。
+${userGreeting}今天是 ${dateStr}。
 
 ## 建議類別
 飲食、交通、娛樂、購物、居住、醫療、教育、收入、其他。
@@ -149,10 +151,11 @@ export async function chat(
   userMessage: string,
   userId: string,
   executeFn: (name: string, args: Record<string, unknown>) => Promise<unknown>,
+  userName?: string,
 ): Promise<ChatResult> {
   const model = genAI.getGenerativeModel({
     model: 'gemini-3.1-flash-lite-preview',
-    systemInstruction: buildSystemPrompt(),
+    systemInstruction: buildSystemPrompt(userName),
     tools,
   })
 

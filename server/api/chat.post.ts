@@ -9,6 +9,7 @@ import { logger } from '../utils/logger'
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
   const userId = (session?.user as { id?: string } | undefined)?.id
+  const userName = (session?.user as { id?: string; name?: string } | undefined)?.name ?? undefined
   if (!userId) {
     throw createError({ statusCode: 401, statusMessage: '請先登入' })
   }
@@ -139,7 +140,7 @@ export default defineEventHandler(async (event) => {
         default:
           return { error: `Unknown function: ${name}` }
       }
-    })
+    }, userName)
 
     // Update user token usage
     await db.update(users)
