@@ -240,7 +240,10 @@ export default defineEventHandler(async (event) => {
             category: category || 'observation',
           })
 
-          logger.log('DB', 'Memory saved', { content, category })
+          logger.log('DB', 'Memory saved', {
+            category: category || 'observation',
+            contentLength: content.length,
+          })
           return { success: true }
         }
 
