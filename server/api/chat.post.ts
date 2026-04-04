@@ -1,10 +1,15 @@
 // server/api/chat.post.ts
 import { getServerSession } from '#auth'
-import { eq, and, between, sql } from 'drizzle-orm'
+import { eq, and, between, desc, sql, inArray } from 'drizzle-orm'
 import { db } from '../utils/db'
-import { users, transactions } from '../database/schema'
+import { users, transactions, chatMessages, assistantProfiles, userMemories } from '../database/schema'
 import { chat, type HistoryMessage } from '../utils/gemini'
 import { logger } from '../utils/logger'
+
+/** Maximum number of history messages loaded from DB for Gemini context. */
+const HISTORY_WINDOW = 20
+/** Maximum memories per user. */
+const MAX_MEMORIES = 20
 
 export default defineEventHandler(async (event) => {
   const session = await getServerSession(event)
@@ -14,26 +19,47 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: '請先登入' })
   }
   const body = await readBody(event)
-  const { message, history } = body
+  const { message } = body
 
   if (!message || typeof message !== 'string') {
     throw createError({ statusCode: 400, statusMessage: '請輸入訊息' })
   }
 
-  // Validate and sanitize incoming conversation history
-  const MAX_HISTORY_TEXT_LENGTH = 4000
-  const safeHistory: HistoryMessage[] = Array.isArray(history)
-    ? history.reduce<HistoryMessage[]>((acc, h) => {
-        if (typeof h !== 'object' || h === null) {
-          return acc
-        }
-        const { role, text } = h as { role?: unknown; text?: unknown }
-        if ((role === 'user' || role === 'model') && typeof text === 'string') {
-          acc.push({ role, text: text.slice(0, MAX_HISTORY_TEXT_LENGTH) })
-        }
-        return acc
-      }, [])
-    : []
+  // Load conversation history from DB (server-managed)
+  const recentMessages = await db
+    .select({ role: chatMessages.role, content: chatMessages.content })
+    .from(chatMessages)
+    .where(eq(chatMessages.userId, userId))
+    .orderBy(desc(chatMessages.createdAt))
+    .limit(HISTORY_WINDOW)
+
+  const history: HistoryMessage[] = recentMessages
+    .reverse()
+    .map(m => ({ role: m.role === 'user' ? 'user' : 'model', text: m.content }))
+
+  // Load assistant profile
+  const profile = await db.query.assistantProfiles.findFirst({
+    where: eq(assistantProfiles.userId, userId),
+  })
+
+  // Load user memories
+  const memories = await db
+    .select({ content: userMemories.content })
+    .from(userMemories)
+    .where(eq(userMemories.userId, userId))
+    .orderBy(desc(userMemories.updatedAt))
+
+  // Load last transaction for context
+  const [lastTx] = await db
+    .select({ amount: transactions.amount, type: transactions.type, category: transactions.category, date: transactions.date })
+    .from(transactions)
+    .where(eq(transactions.userId, userId))
+    .orderBy(desc(transactions.createdAt))
+    .limit(1)
+
+  const lastActivity = lastTx
+    ? `上次記帳：${lastTx.date} ${lastTx.type} ${lastTx.category} ${lastTx.amount} 元`
+    : undefined
 
   try {
     const result = await chat(message, userId, async (name, args) => {
@@ -186,10 +212,65 @@ export default defineEventHandler(async (event) => {
           return { success: true }
         }
 
+        case 'saveMemory': {
+          const content = args.content as string
+          const category = args.category as string
+          if (!content || typeof content !== 'string') {
+            return { error: '無效的記憶內容' }
+          }
+
+          const VALID_CATEGORIES = ['preference', 'habit', 'observation']
+          const normalizedCategory = VALID_CATEGORIES.includes(category)
+            ? category
+            : 'observation'
+
+          // Count existing memories
+          const existingMemories = await db
+            .select({ id: userMemories.id, createdAt: userMemories.createdAt })
+            .from(userMemories)
+            .where(eq(userMemories.userId, userId))
+            .orderBy(userMemories.createdAt)
+
+          // FIFO: remove oldest if at limit (single query)
+          if (existingMemories.length >= MAX_MEMORIES) {
+            const idsToRemove = existingMemories
+              .slice(0, existingMemories.length - MAX_MEMORIES + 1)
+              .map(m => m.id)
+            await db.delete(userMemories).where(inArray(userMemories.id, idsToRemove))
+          }
+
+          await db.insert(userMemories).values({
+            userId,
+            content: content.slice(0, 500),
+            category: normalizedCategory,
+          })
+
+          logger.log('DB', 'Memory saved', {
+            category: normalizedCategory,
+            contentLength: content.length,
+          })
+          return { success: true }
+        }
+
         default:
           return { error: `Unknown function: ${name}` }
       }
-    }, userName, safeHistory)
+    }, userName, history, {
+      assistantName: profile?.name || '小帳',
+      assistantPersonality: profile?.personalityDesc || profile?.personality || '活潑可愛',
+      memories: memories.map(m => m.content),
+      lastActivity,
+    })
+
+    // Persist messages to chat_messages
+    try {
+      await db.insert(chatMessages).values([
+        { userId, role: 'user', content: message },
+        { userId, role: 'model', content: result.reply },
+      ])
+    } catch (e) {
+      logger.log('Error', 'Failed to persist chat messages', e)
+    }
 
     // Update user token usage
     await db.update(users)

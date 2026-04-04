@@ -10,6 +10,8 @@ interface Message {
 defineProps<{
   messages: Message[]
   loading: boolean
+  assistantAvatar?: string
+  assistantName?: string
 }>()
 
 const listRef = ref<HTMLDivElement>()
@@ -27,24 +29,30 @@ defineExpose({ scrollToBottom })
 
 <template>
   <div ref="listRef" class="flex-1 overflow-y-auto p-4">
-    <div v-if="messages.length === 0" class="flex h-full items-center justify-center text-gray-400 text-sm">
-      輸入訊息開始記帳，例如「今天午餐 200 元」
-    </div>
-
     <ChatBubble
       v-for="msg in messages"
       :key="msg.id"
       :role="msg.role"
       :text="msg.text"
       :chart="msg.chart"
+      :assistant-avatar="assistantAvatar"
+      :assistant-name="assistantName"
     />
 
+    <div
+      v-if="!messages.length && !loading"
+      class="py-8 text-center text-sm text-gray-500"
+    >
+      Start the conversation by sending a message.
+    </div>
     <!-- AI loading bubble -->
     <ChatBubble
       v-if="loading"
       role="ai"
       text=""
       :loading="true"
+      :assistant-avatar="assistantAvatar"
+      :assistant-name="assistantName"
     />
   </div>
 </template>
