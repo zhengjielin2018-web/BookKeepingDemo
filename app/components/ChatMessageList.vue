@@ -39,6 +39,12 @@ defineExpose({ scrollToBottom })
       :assistant-name="assistantName"
     />
 
+    <div
+      v-if="!messages.length && !loading"
+      class="py-8 text-center text-sm text-gray-500"
+    >
+      Start the conversation by sending a message.
+    </div>
     <!-- AI loading bubble -->
     <ChatBubble
       v-if="loading"
