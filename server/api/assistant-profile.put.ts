@@ -23,19 +23,25 @@ export default defineEventHandler(async (event) => {
   const { name, avatar, personality, personalityDesc } = body
 
   // Validate
-  if (name !== undefined && (typeof name !== 'string' || name.length < 1 || name.length > 20)) {
+  const trimmedName = typeof name === 'string' ? name.trim() : undefined
+  if (name !== undefined && (typeof name !== 'string' || !trimmedName || trimmedName.length < 1 || trimmedName.length > 20)) {
     throw createError({ statusCode: 400, statusMessage: '名字長度需在 1-20 字之間' })
   }
   if (avatar !== undefined && !ALLOWED_AVATARS.includes(avatar)) {
     throw createError({ statusCode: 400, statusMessage: '無效的頭像選項' })
   }
-  if (personalityDesc !== undefined && typeof personalityDesc === 'string' && personalityDesc.length > 200) {
-    throw createError({ statusCode: 400, statusMessage: '自訂個性描述上限 200 字' })
+  if (personalityDesc !== undefined) {
+    if (typeof personalityDesc !== 'string') {
+      throw createError({ statusCode: 400, statusMessage: '無效的個性描述格式' })
+    }
+    if (personalityDesc.length > 200) {
+      throw createError({ statusCode: 400, statusMessage: '自訂個性描述上限 200 字' })
+    }
   }
 
   // Build update object
   const updates: Record<string, unknown> = { updatedAt: new Date() }
-  if (name !== undefined) updates.name = name
+  if (trimmedName !== undefined) updates.name = trimmedName
   if (avatar !== undefined) updates.avatar = avatar
   if (personality !== undefined) {
     updates.personality = personality

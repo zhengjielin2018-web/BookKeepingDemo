@@ -1,6 +1,6 @@
 // server/api/chat.post.ts
 import { getServerSession } from '#auth'
-import { eq, and, between, desc, sql } from 'drizzle-orm'
+import { eq, and, between, desc, sql, inArray } from 'drizzle-orm'
 import { db } from '../utils/db'
 import { users, transactions, chatMessages, assistantProfiles, userMemories } from '../database/schema'
 import { chat, type HistoryMessage } from '../utils/gemini'
@@ -219,6 +219,11 @@ export default defineEventHandler(async (event) => {
             return { error: '無效的記憶內容' }
           }
 
+          const VALID_CATEGORIES = ['preference', 'habit', 'observation'] as const
+          const normalizedCategory = VALID_CATEGORIES.includes(category as typeof VALID_CATEGORIES[number])
+            ? (category as string)
+            : 'observation'
+
           // Count existing memories
           const existingMemories = await db
             .select({ id: userMemories.id, createdAt: userMemories.createdAt })
@@ -226,22 +231,22 @@ export default defineEventHandler(async (event) => {
             .where(eq(userMemories.userId, userId))
             .orderBy(userMemories.createdAt)
 
-          // FIFO: remove oldest if at limit
+          // FIFO: remove oldest if at limit (single query)
           if (existingMemories.length >= MAX_MEMORIES) {
-            const toRemove = existingMemories.slice(0, existingMemories.length - MAX_MEMORIES + 1)
-            for (const mem of toRemove) {
-              await db.delete(userMemories).where(eq(userMemories.id, mem.id))
-            }
+            const idsToRemove = existingMemories
+              .slice(0, existingMemories.length - MAX_MEMORIES + 1)
+              .map(m => m.id)
+            await db.delete(userMemories).where(inArray(userMemories.id, idsToRemove))
           }
 
           await db.insert(userMemories).values({
             userId,
             content: content.slice(0, 500),
-            category: category || 'observation',
+            category: normalizedCategory,
           })
 
           logger.log('DB', 'Memory saved', {
-            category: category || 'observation',
+            category: normalizedCategory,
             contentLength: content.length,
           })
           return { success: true }
@@ -257,7 +262,7 @@ export default defineEventHandler(async (event) => {
       lastActivity,
     })
 
-    // Persist messages to chat_messages (non-blocking for response)
+    // Persist messages to chat_messages
     try {
       await db.insert(chatMessages).values([
         { userId, role: 'user', content: message },

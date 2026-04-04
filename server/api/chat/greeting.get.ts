@@ -4,7 +4,7 @@ import { db } from '../../utils/db'
 import { assistantProfiles, transactions, userMemories } from '../../database/schema'
 
 function getTimeGreeting(): string {
-  const hour = new Date().getHours()
+  const hour = new Date().getUTCHours()
   if (hour >= 5 && hour < 12) return '早安'
   if (hour >= 12 && hour < 18) return '午安'
   return '晚安'
