@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
 
   const history: HistoryMessage[] = recentMessages
     .reverse()
-    .map(m => ({ role: m.role as 'user' | 'model', text: m.content }))
+    .map(m => ({ role: m.role === 'user' ? 'user' : 'model', text: m.content }))
 
   // Load assistant profile
   const profile = await db.query.assistantProfiles.findFirst({
