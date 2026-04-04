@@ -3,7 +3,7 @@ import { getServerSession } from '#auth'
 import { eq, and, between, sql } from 'drizzle-orm'
 import { db } from '../utils/db'
 import { users, transactions } from '../database/schema'
-import { chat } from '../utils/gemini'
+import { chat, type HistoryMessage } from '../utils/gemini'
 import { logger } from '../utils/logger'
 
 export default defineEventHandler(async (event) => {
@@ -14,11 +14,26 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: '請先登入' })
   }
   const body = await readBody(event)
-  const { message } = body
+  const { message, history } = body
 
   if (!message || typeof message !== 'string') {
     throw createError({ statusCode: 400, statusMessage: '請輸入訊息' })
   }
+
+  // Validate and sanitize incoming conversation history
+  const MAX_HISTORY_TEXT_LENGTH = 4000
+  const safeHistory: HistoryMessage[] = Array.isArray(history)
+    ? history.reduce<HistoryMessage[]>((acc, h) => {
+        if (typeof h !== 'object' || h === null) {
+          return acc
+        }
+        const { role, text } = h as { role?: unknown; text?: unknown }
+        if ((role === 'user' || role === 'model') && typeof text === 'string') {
+          acc.push({ role, text: text.slice(0, MAX_HISTORY_TEXT_LENGTH) })
+        }
+        return acc
+      }, [])
+    : []
 
   try {
     const result = await chat(message, userId, async (name, args) => {
@@ -108,8 +123,42 @@ export default defineEventHandler(async (event) => {
         }
 
         case 'updateTransaction': {
-          const txId = args.transactionId as string
-          const updates = args.updates as Record<string, unknown>
+          // Validate inputs before touching them
+          if (typeof args.transactionId !== 'string' || !args.transactionId) {
+            return { error: '無效的交易 ID' }
+          }
+          if (typeof args.updates !== 'object' || args.updates === null || Array.isArray(args.updates)) {
+            return { error: '無效的更新內容' }
+          }
+
+          const txId = args.transactionId
+          const rawUpdates = args.updates as Record<string, unknown>
+
+          // Sanitize: only allow valid, updatable fields with proper type and domain checks
+          const updates: {
+            amount?: number
+            type?: string
+            category?: string
+            description?: string | null
+            date?: string
+          } = {}
+          if (typeof rawUpdates.amount === 'number' && Number.isInteger(rawUpdates.amount) && rawUpdates.amount > 0) {
+            updates.amount = rawUpdates.amount
+          }
+          if (rawUpdates.type === '收入' || rawUpdates.type === '支出') {
+            updates.type = rawUpdates.type
+          }
+          if (typeof rawUpdates.category === 'string' && rawUpdates.category.length > 0) {
+            updates.category = rawUpdates.category
+          }
+          if ('description' in rawUpdates && (typeof rawUpdates.description === 'string' || rawUpdates.description === null)) {
+            updates.description = rawUpdates.description
+          }
+          if (typeof rawUpdates.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawUpdates.date)) {
+            updates.date = rawUpdates.date
+          }
+
+          if (Object.keys(updates).length === 0) return { error: '沒有有效的更新欄位' }
 
           // Verify ownership
           const existing = await db.query.transactions.findFirst({
@@ -140,7 +189,7 @@ export default defineEventHandler(async (event) => {
         default:
           return { error: `Unknown function: ${name}` }
       }
-    }, userName)
+    }, userName, safeHistory)
 
     // Update user token usage
     await db.update(users)

@@ -136,6 +136,14 @@ ${userGreeting}今天是 ${dateStr}。
 簡短回覆並引導使用者回到記帳功能。`
 }
 
+export interface HistoryMessage {
+  role: 'user' | 'model'
+  text: string
+}
+
+/** Maximum number of history messages (user + model turns) passed to Gemini. */
+const SLIDING_WINDOW_SIZE = 20
+
 export interface ChatResult {
   reply: string
   chart: {
@@ -152,6 +160,7 @@ export async function chat(
   userId: string,
   executeFn: (name: string, args: Record<string, unknown>) => Promise<unknown>,
   userName?: string,
+  history?: HistoryMessage[],
 ): Promise<ChatResult> {
   const model = genAI.getGenerativeModel({
     model: 'gemini-3.1-flash-lite-preview',
@@ -159,7 +168,17 @@ export async function chat(
     tools,
   })
 
-  const chatSession = model.startChat()
+  // Apply sliding window and convert to Gemini Content format
+  const windowedHistory = history && history.length > SLIDING_WINDOW_SIZE
+    ? history.slice(-SLIDING_WINDOW_SIZE)
+    : (history ?? [])
+
+  const chatSession = model.startChat({
+    history: windowedHistory.map(msg => ({
+      role: msg.role,
+      parts: [{ text: msg.text }],
+    })),
+  })
 
   logger.log('Gemini', 'Sending user message', { userMessage })
 
