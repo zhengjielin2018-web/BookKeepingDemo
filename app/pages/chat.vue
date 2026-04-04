@@ -9,7 +9,13 @@ interface ChatMessage {
   chart?: { type: string; title: string; labels: string[]; datasets: { data: number[] }[] } | null
 }
 
+interface HistoryMessage {
+  role: 'user' | 'model'
+  text: string
+}
+
 const messages = ref<ChatMessage[]>([])
+const conversationHistory = ref<HistoryMessage[]>([])
 const loading = ref(false)
 const messageList = ref<InstanceType<typeof ChatMessageList> | null>(null)
 
@@ -26,7 +32,7 @@ async function handleSend(text: string) {
   try {
     const res = await $fetch<{ reply: string; chart: ChatMessage['chart'] }>('/api/chat', {
       method: 'POST',
-      body: { message: text },
+      body: { message: text, history: conversationHistory.value },
     })
 
     messages.value.push({
@@ -35,6 +41,12 @@ async function handleSend(text: string) {
       text: res.reply,
       chart: res.chart,
     })
+
+    // Append to conversation history for next turn
+    conversationHistory.value.push(
+      { role: 'user', text },
+      { role: 'model', text: res.reply },
+    )
   } catch (e: any) {
     messages.value.push({
       id: (Date.now() + 1).toString(),

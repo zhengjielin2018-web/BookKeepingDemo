@@ -226,14 +226,15 @@ INDEX idx_transactions_user_category (userId, category)
 
 ### AI 對話流程
 
-1. **使用者輸入** → 前端送至 `POST /api/chat`
+1. **使用者輸入** → 前端送至 `POST /api/chat`（同時附帶本輪對話的歷史訊息）
 2. **後端驗證** → 檢查 Session，取得 userId
-3. **呼叫 Gemini** → 傳送訊息 + Function Declarations
+3. **呼叫 Gemini** → 傳送訊息 + 歷史訊息 + Function Declarations（Sliding Window 最多 20 則）
 4. **AI 解析** → 判斷使用者意圖，決定呼叫哪個函數
 5. **函數執行** → 後端執行對應的資料庫操作
 6. **結果回傳** → AI 生成自然語言回覆
 7. **圖表生成** → 若是統計查詢，自動生成圖表設定
 8. **Token 記錄** → 更新使用者的 AI Token 使用量
+9. **前端更新歷史** → 將本輪使用者訊息與 AI 回覆追加至 `conversationHistory`，供下一輪請求使用
 
 ### 圖表自動生成
 
@@ -344,9 +345,16 @@ INDEX idx_transactions_user_category (userId, category)
 **請求 Body**:
 ```json
 {
-  "message": "今天午餐吃拉麵花了 200 元"
+  "message": "今天午餐吃拉麵花了 200 元",
+  "history": [
+    { "role": "user", "text": "上一輪使用者訊息" },
+    { "role": "model", "text": "上一輪 AI 回覆" }
+  ]
 }
 ```
+
+`history` 為選填，傳入同一輪對話中的歷史訊息陣列（格式：`{ role: 'user' | 'model', text: string }`）。
+後端會保留最新的 20 則訊息（Sliding Window），超過時截斷最舊的部分。
 
 **回應**:
 ```json
@@ -590,6 +598,6 @@ pm2 start .output/server/index.mjs
 
 ---
 
-**版本**: 1.0.0  
-**最後更新**: 2024-04-03  
+**版本**: 1.1.0  
+**最後更新**: 2026-04-04  
 **維護者**: zhengjielin2018-web
