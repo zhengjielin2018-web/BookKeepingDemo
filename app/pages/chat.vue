@@ -42,11 +42,15 @@ async function handleSend(text: string) {
       chart: res.chart,
     })
 
-    // Append to conversation history for next turn
+    // Append to conversation history for next turn, then trim to sliding window
     conversationHistory.value.push(
       { role: 'user', text },
       { role: 'model', text: res.reply },
     )
+    const SLIDING_WINDOW_SIZE = 20
+    if (conversationHistory.value.length > SLIDING_WINDOW_SIZE) {
+      conversationHistory.value = conversationHistory.value.slice(-SLIDING_WINDOW_SIZE)
+    }
   } catch (e: any) {
     messages.value.push({
       id: (Date.now() + 1).toString(),
