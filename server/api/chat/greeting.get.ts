@@ -10,10 +10,16 @@ function getTimeGreeting(): string {
   return '晚安'
 }
 
+function parseDateOnlyAsUtc(dateStr: string): number {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return Date.UTC(year, month - 1, day)
+}
+
 function daysSince(dateStr: string): number {
   const now = new Date()
-  const then = new Date(dateStr)
-  return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24))
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  const thenUtc = parseDateOnlyAsUtc(dateStr)
+  return Math.floor((todayUtc - thenUtc) / (1000 * 60 * 60 * 24))
 }
 
 function formatDaysAgo(days: number): string {
