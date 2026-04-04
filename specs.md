@@ -598,6 +598,123 @@ pm2 start .output/server/index.mjs
 
 ---
 
-**版本**: 1.1.0  
+**版本**: 1.2.0  
 **最後更新**: 2026-04-04  
 **維護者**: zhengjielin2018-web
+
+---
+
+## 🐹 v1.2 新增功能：友善 AI 助理
+
+### 助理自訂系統
+
+使用者可自訂助理的名字、長相（emoji 頭像）和個性，打造專屬記帳小助理。
+
+#### 自訂項目
+| 項目 | 欄位 | 預設值 |
+|------|------|--------|
+| 名字 | `assistantName` | 小帳 |
+| 長相 | `assistantAvatar` | 🐹 |
+| 個性 | `assistantPersonality` | 活潑可愛 |
+
+#### 頭像選項
+`🐹 🐱 🐶 🐰 🦊 🐻 🐼 🐨 🦉 🐧 🐝 🤖`
+
+#### 個性選項
+- **活潑可愛**：溫暖俏皮，使用語助詞和 emoji
+- **溫柔體貼**：細膩關心，像貼心好朋友
+- **專業幹練**：簡潔有條理，可靠的財務秘書
+- **搞笑幽默**：風趣搞笑，諧音梗和雙關語
+- **自訂**：使用者自由輸入（上限 200 字）
+
+#### 資料表：assistant_profiles
+```typescript
+{
+  id: UUID (PK)
+  userId: UUID (FK -> users.id, UNIQUE, CASCADE DELETE)
+  name: VARCHAR(50) (DEFAULT '小帳')
+  avatar: VARCHAR(10) (DEFAULT '🐹')
+  personality: TEXT (DEFAULT '活潑可愛')
+  personalityDesc: TEXT (個性詳細描述)
+  createdAt: TIMESTAMP
+  updatedAt: TIMESTAMP
+}
+```
+
+### 記憶系統
+
+#### 短期記憶：對話歷史持久化
+
+對話紀錄存入資料庫，重新整理頁面不遺失。伺服器端管理歷史訊息（前端不再傳送 history）。
+
+#### 資料表：chat_messages
+```typescript
+{
+  id: UUID (PK)
+  userId: UUID (FK -> users.id, CASCADE DELETE)
+  role: VARCHAR(10) ('user' | 'model')
+  content: TEXT
+  createdAt: TIMESTAMP
+}
+// 索引: (userId, createdAt)
+```
+
+#### 長期記憶：使用者洞察
+
+AI 自動記住使用者的偏好和習慣（如常去的店、消費模式），並在對話中自然引用。
+
+#### 資料表：user_memories
+```typescript
+{
+  id: UUID (PK)
+  userId: UUID (FK -> users.id, CASCADE DELETE)
+  content: TEXT
+  category: VARCHAR(50) ('preference' | 'habit' | 'observation')
+  createdAt: TIMESTAMP
+  updatedAt: TIMESTAMP
+}
+// 索引: (userId)
+```
+
+#### Gemini Function：saveMemory
+```typescript
+{
+  name: 'saveMemory',
+  parameters: {
+    content: STRING (必填, 要記住的內容)
+    category: ENUM('preference', 'habit', 'observation') (必填)
+  }
+}
+```
+每位使用者上限 20 筆記憶（FIFO 淘汰）。
+
+### 問候系統
+
+頁面載入時顯示個人化問候語（伺服器端生成，不消耗 AI token）：
+- 時段感知（早安/午安/晚安）
+- 引用上次記帳紀錄
+- 偶爾引用長期記憶
+
+### 新增 API
+
+| 端點 | 方法 | 說明 |
+|------|------|------|
+| `/api/assistant-profile` | GET | 取得助理設定 |
+| `/api/assistant-profile` | PUT | 更新助理設定 |
+| `/api/chat/history` | GET | 取得最近 30 則對話訊息 |
+| `/api/chat/greeting` | GET | 取得個人化問候語 |
+
+### 修改 API
+
+| 端點 | 方法 | 變更 |
+|------|------|------|
+| `/api/chat` | POST | 移除 client history；從 DB 載入歷史、記憶、助理設定；持久化訊息 |
+
+### UI 增強
+
+- AI 訊息左側顯示動態 emoji 頭像
+- Header 動態顯示助理名字與頭像
+- 輸入框 placeholder 動態引用助理名字
+- 思考中動畫顯示「{助理名字}正在思考中...」
+- 新增助理設定面板（側邊 Sheet）
+- UserMenu 新增「助理設定」選項

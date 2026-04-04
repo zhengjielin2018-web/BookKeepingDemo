@@ -9,15 +9,55 @@ interface ChatMessage {
   chart?: { type: string; title: string; labels: string[]; datasets: { data: number[] }[] } | null
 }
 
-interface HistoryMessage {
-  role: 'user' | 'model'
-  text: string
+interface AssistantProfile {
+  name: string
+  avatar: string
+  personality: string
+  personalityDesc: string | null
 }
 
 const messages = ref<ChatMessage[]>([])
-const conversationHistory = ref<HistoryMessage[]>([])
 const loading = ref(false)
 const messageList = ref<InstanceType<typeof ChatMessageList> | null>(null)
+const assistantProfile = ref<AssistantProfile>({
+  name: '小帳',
+  avatar: '🐹',
+  personality: '活潑可愛',
+  personalityDesc: null,
+})
+
+// Load history and profile on mount
+onMounted(async () => {
+  // Load assistant profile and chat history in parallel
+  const [profileData, historyData, greetingData] = await Promise.all([
+    $fetch<AssistantProfile>('/api/assistant-profile').catch(() => null),
+    $fetch<{ messages: { id: string; role: string; content: string }[] }>('/api/chat/history').catch(() => null),
+    $fetch<{ greeting: string }>('/api/chat/greeting').catch(() => null),
+  ])
+
+  if (profileData) {
+    assistantProfile.value = profileData
+  }
+
+  if (historyData?.messages?.length) {
+    messages.value = historyData.messages.map(m => ({
+      id: m.id,
+      role: m.role === 'user' ? 'user' : 'ai',
+      text: m.content,
+    }))
+  }
+
+  // Show greeting as first message if no history
+  if (!historyData?.messages?.length && greetingData?.greeting) {
+    messages.value.push({
+      id: 'greeting',
+      role: 'ai',
+      text: greetingData.greeting,
+    })
+  }
+
+  nextTick(() => messageList.value?.scrollToBottom())
+})
 
 async function handleSend(text: string) {
   // Add user message
@@ -32,7 +72,7 @@ async function handleSend(text: string) {
   try {
     const res = await $fetch<{ reply: string; chart: ChatMessage['chart'] }>('/api/chat', {
       method: 'POST',
-      body: { message: text, history: conversationHistory.value },
+      body: { message: text },
     })
 
     messages.value.push({
@@ -41,16 +81,6 @@ async function handleSend(text: string) {
       text: res.reply,
       chart: res.chart,
     })
-
-    // Append to conversation history for next turn, then trim to sliding window
-    conversationHistory.value.push(
-      { role: 'user', text },
-      { role: 'model', text: res.reply },
-    )
-    const SLIDING_WINDOW_SIZE = 20
-    if (conversationHistory.value.length > SLIDING_WINDOW_SIZE) {
-      conversationHistory.value = conversationHistory.value.slice(-SLIDING_WINDOW_SIZE)
-    }
   } catch (e: any) {
     messages.value.push({
       id: (Date.now() + 1).toString(),
@@ -64,14 +94,20 @@ async function handleSend(text: string) {
     messageList.value?.scrollToBottom()
   }
 }
+
+function onAssistantUpdated(profile: AssistantProfile) {
+  assistantProfile.value = profile
+}
 </script>
 
 <template>
   <div class="flex h-screen flex-col">
     <!-- Header -->
     <header class="flex items-center justify-between border-b bg-white px-4 py-3">
-      <h1 class="text-lg font-bold">AI 記帳助手</h1>
-      <UserMenu />
+      <h1 class="text-lg font-bold">
+        {{ assistantProfile.name }} {{ assistantProfile.avatar }}
+      </h1>
+      <UserMenu @assistant-updated="onAssistantUpdated" />
     </header>
 
     <!-- Messages -->
@@ -79,12 +115,18 @@ async function handleSend(text: string) {
       ref="messageList"
       :messages="messages"
       :loading="loading"
+      :assistant-avatar="assistantProfile.avatar"
+      :assistant-name="assistantProfile.name"
       class="flex-1 max-w-3xl w-full mx-auto"
     />
 
     <!-- Input -->
     <div class="max-w-3xl w-full mx-auto">
-      <ChatInput :disabled="loading" @send="handleSend" />
+      <ChatInput
+        :disabled="loading"
+        :placeholder="`跟${assistantProfile.name}說說今天的花費吧～`"
+        @send="handleSend"
+      />
     </div>
 
     <!-- Debug Panel -->

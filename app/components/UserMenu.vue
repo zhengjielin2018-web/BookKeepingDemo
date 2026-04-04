@@ -4,10 +4,24 @@ const { data: session, signOut } = useAuth()
 const config = useRuntimeConfig()
 
 const open = ref(false)
+const settingsOpen = ref(false)
+
+const emit = defineEmits<{
+  assistantUpdated: [profile: { name: string; avatar: string; personality: string; personalityDesc: string | null }]
+}>()
 
 async function handleLogout() {
   await signOut({ redirect: false })
   navigateTo('/')
+}
+
+function openSettings() {
+  open.value = false
+  settingsOpen.value = true
+}
+
+function onAssistantSaved(profile: { name: string; avatar: string; personality: string; personalityDesc: string | null }) {
+  emit('assistantUpdated', profile)
 }
 </script>
 
@@ -31,6 +45,12 @@ async function handleLogout() {
         {{ session?.user?.email }}
       </div>
       <button
+        @click="openSettings"
+        class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+      >
+        助理設定
+      </button>
+      <button
         @click="handleLogout"
         class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
       >
@@ -43,5 +63,8 @@ async function handleLogout() {
 
     <!-- Click outside to close -->
     <div v-if="open" class="fixed inset-0 z-40" @click="open = false" />
+
+    <!-- Assistant Settings Sheet -->
+    <AssistantSettings v-model:open="settingsOpen" @saved="onAssistantSaved" />
   </div>
 </template>

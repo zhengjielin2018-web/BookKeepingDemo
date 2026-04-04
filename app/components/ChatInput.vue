@@ -1,6 +1,9 @@
 <!-- app/components/ChatInput.vue -->
 <script setup lang="ts">
-const props = defineProps<{ disabled: boolean }>()
+const props = defineProps<{
+  disabled: boolean
+  placeholder?: string
+}>()
 const emit = defineEmits<{ send: [message: string] }>()
 
 const message = ref('')
@@ -21,7 +24,7 @@ function handleSend() {
     <input
       v-model="message"
       type="text"
-      placeholder="輸入訊息，例如「今天午餐 200 元」"
+      :placeholder="placeholder || '輸入訊息，例如「今天午餐 200 元」'"
       :disabled="disabled"
       class="flex-1 rounded-full border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black disabled:opacity-50"
       @keydown.enter.prevent="handleSend"

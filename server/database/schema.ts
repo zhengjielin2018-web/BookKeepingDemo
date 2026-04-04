@@ -67,6 +67,40 @@ export const transactions = pgTable('transactions', {
   index('idx_transactions_user_category').on(table.userId, table.category),
 ])
 
+// ===== v1.2 tables =====
+
+export const assistantProfiles = pgTable('assistant_profiles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+  name: varchar('name', { length: 50 }).notNull().default('小帳'),
+  avatar: varchar('avatar', { length: 10 }).notNull().default('🐹'),
+  personality: text('personality').notNull().default('活潑可愛'),
+  personalityDesc: text('personality_desc'),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
+})
+
+export const chatMessages = pgTable('chat_messages', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role: varchar('role', { length: 10 }).notNull(),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+}, (table) => [
+  index('idx_chat_messages_user_created').on(table.userId, table.createdAt),
+])
+
+export const userMemories = pgTable('user_memories', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  category: varchar('category', { length: 50 }).notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
+}, (table) => [
+  index('idx_user_memories_user').on(table.userId),
+])
+
 export const inviteCodes = pgTable('invite_codes', {
   id: uuid('id').defaultRandom().primaryKey(),
   code: varchar('code', { length: 50 }).notNull().unique(),
