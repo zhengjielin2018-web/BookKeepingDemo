@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
 
   // Validate
   const trimmedName = typeof name === 'string' ? name.trim() : undefined
-  if (name !== undefined && (typeof name !== 'string' || !trimmedName || trimmedName.length < 1 || trimmedName.length > 20)) {
+  if (name !== undefined && (typeof name !== 'string' || !trimmedName || trimmedName.length > 20)) {
     throw createError({ statusCode: 400, statusMessage: '名字長度需在 1-20 字之間' })
   }
   if (avatar !== undefined && !ALLOWED_AVATARS.includes(avatar)) {

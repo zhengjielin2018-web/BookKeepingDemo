@@ -219,9 +219,9 @@ export default defineEventHandler(async (event) => {
             return { error: '無效的記憶內容' }
           }
 
-          const VALID_CATEGORIES = ['preference', 'habit', 'observation'] as const
-          const normalizedCategory = VALID_CATEGORIES.includes(category as typeof VALID_CATEGORIES[number])
-            ? (category as string)
+          const VALID_CATEGORIES = ['preference', 'habit', 'observation']
+          const normalizedCategory = VALID_CATEGORIES.includes(category)
+            ? category
             : 'observation'
 
           // Count existing memories
