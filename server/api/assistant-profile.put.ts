@@ -56,12 +56,18 @@ export default defineEventHandler(async (event) => {
       .set(updates)
       .where(eq(assistantProfiles.userId, userId))
   } else {
+    const newPersonality = (personality as string) || '活潑可愛'
+    const newPersonalityDesc =
+      (personalityDesc as string) ||
+      PERSONALITY_PRESETS[newPersonality] ||
+      PERSONALITY_PRESETS['活潑可愛']
+
     await db.insert(assistantProfiles).values({
       userId,
       name: (name as string) || '小帳',
       avatar: (avatar as string) || '🐹',
-      personality: (personality as string) || '活潑可愛',
-      personalityDesc: (personalityDesc as string) || PERSONALITY_PRESETS['活潑可愛'],
+      personality: newPersonality,
+      personalityDesc: newPersonalityDesc,
     })
   }
 
