@@ -19,9 +19,9 @@ jobs:
     name: Build (Nuxt)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -39,11 +39,15 @@ jobs:
           NEXTAUTH_URL: http://localhost:3000
 
       - name: Upload build output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: nuxt-output
           path: .output
           retention-days: 7
+          # .output 以點開頭，upload-artifact 從 v4.4 起預設排除隱藏檔，
+          # 不加這個的話會是一包空的 artifact。
+          include-hidden-files: true
+          if-no-files-found: error
 
   database:
     name: Database (migrate + assertions)
@@ -70,9 +74,9 @@ jobs:
       POSTGRES_URL: postgresql://ci:ci@localhost:5432/bookkeeping_ci
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -106,9 +110,9 @@ jobs:
     name: Schema drift (schema.ts vs migrations)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
