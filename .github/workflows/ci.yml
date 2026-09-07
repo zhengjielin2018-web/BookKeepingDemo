@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  build:
+    name: Build (Nuxt)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # 建置階段不會真的連線任何服務，這些假值只是為了讓 runtimeConfig 有東西可讀。
+          POSTGRES_URL: postgresql://ci:ci@localhost:5432/ci
+          GEMINI_API_KEY: ci-dummy-key
+          AUTH_SECRET: ci-dummy-secret
+          NEXTAUTH_URL: http://localhost:3000
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuxt-output
+          path: .output
+          retention-days: 7
+
+  database:
+    name: Database (migrate + assertions)
+    runs-on: ubuntu-latest
+
+    # 起一個真的 PostgreSQL，而不是用 mock：migration 與索引、外鍵這些東西，
+    # 只有讓真的資料庫執行過才算驗證。
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: bookkeeping_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d bookkeeping_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      POSTGRES_URL: postgresql://ci:ci@localhost:5432/bookkeeping_ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ensure psql is available
+        run: |
+          psql --version || {
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends postgresql-client
+          }
+
+      - name: Apply migrations
+        run: npx drizzle-kit migrate
+
+      - name: Assert schema shape
+        run: psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 -f .github/sql/schema-assertions.sql
+
+      - name: Assert data behaviour
+        run: psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 -f .github/sql/behaviour-checks.sql
+
+      - name: Migrations are idempotent (re-run must be a no-op)
+        run: npx drizzle-kit migrate
+
+      - name: Re-assert schema after second run
+        run: psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 -f .github/sql/schema-assertions.sql
+
+  schema-drift:
+    name: Schema drift (schema.ts vs migrations)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Regenerate migrations from schema.ts
+        # generate 只讀 schema.ts、不連線資料庫，但 drizzle.config.ts 要求 url 有值。
+        run: npx drizzle-kit generate
+        env:
+          POSTGRES_URL: postgresql://ci:ci@localhost:5432/ci
+
+      - name: Fail if a new migration was produced
+        run: |
+          if [ -n "$(git status --porcelain server/database/migrations)" ]; then
+            echo "::error::server/database/schema.ts 有變更沒有反映在 server/database/migrations，請在本機執行 'npx drizzle-kit generate' 並把產出一起提交。"
+            git status --porcelain server/database/migrations
+            git --no-pager diff -- server/database/migrations
+            exit 1
+          fi
+          echo "沒有 drift：migrations 與 schema.ts 一致"
